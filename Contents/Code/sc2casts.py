@@ -86,6 +86,8 @@ def fillFromNode(cast, node):
     cast.bestofnum = subnodeInt(node, 'bestofnum')
     cast.rateup = subnodeInt(node, 'up')
     cast.ratedown = subnodeInt(node, 'down')
+    datestr = subnodeText(node, 'date_added')
+    cast.date_added = Datetime.ParseDate(datestr)
 
     for player in node.xpath("./*[substring(name(),1,6) = 'player']"):
         cast.players.append(player.text)
