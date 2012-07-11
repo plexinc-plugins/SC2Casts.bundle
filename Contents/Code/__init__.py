@@ -89,7 +89,7 @@ def SubMenuList(page):
 
 ###################################################################################################
                                                
-def SearchList(query):
+def SearchList(query = 'the'):
     cl = sc2casts.SC2CastsClient()
     return SeriesList('Search results', cl.search(query))
                                                
