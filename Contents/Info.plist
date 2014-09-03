@@ -7,7 +7,7 @@
 	<key>CFBundleExecutable</key>
 	<string>Hello</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.plexapp.plugins.sc2castscom</string>
+	<string>com.plexapp.plugins.sc2casts2</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundlePackageType</key>
@@ -21,7 +21,6 @@
 	<key>PlexAudioCodec</key>
 	<array>
 		<string>AAC</string>
-		<string>MP3</string>
 	</array>
 	<key>PlexMediaContainer</key>
 	<array>
@@ -34,7 +33,6 @@
 	<key>PlexVideoCodec</key>
 	<array>
 		<string>H.264</string>
-		<string>H.263</string>
 	</array>
 </dict>
 </plist>

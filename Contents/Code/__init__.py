@@ -2,11 +2,13 @@
 # -*- coding: utf-8 -*-
 #
 #   Copyright (c) 2008-2011 Tobias Hieta <tobias@hieta.se>
-#
+#   Modified 2014 Andrew Cornforth
 
 import sc2casts
 import re
 import cerealizer
+import datetime
+import time
 
 TITLE = 'SC2Casts'
 ART = 'art-default.jpg'
@@ -30,7 +32,6 @@ USER_AGENT = 'Mozilla/5.0 (Macintosh; U; Intel Mac OS X 10.6; en-US; rv:1.9.2.12
 ###################################################################################################
 
 def Start():
-
     Plugin.AddViewGroup("List", viewMode="List", mediaType="items")
     Plugin.AddViewGroup("InfoList", viewMode="InfoList", mediaType="items")
     
@@ -50,10 +51,11 @@ def Start():
 
 ###################################################################################################
 
-@handler('/video/sc2castscom', TITLE, thumb = ICON, art = ART)
+@handler('/video/sc2casts2', TITLE, thumb = ICON, art = ART)
 def MainMenu():
     oc = ObjectContainer()
-    
+    if ("RecentEvent1" in Dict):
+        oc.add(DirectoryObject(key = Callback(RecentEventList), title = "Recently Watched Events"))
     oc.add(DirectoryObject(key = Callback(RecentList), title = "Recent Casts"))
     oc.add(DirectoryObject(key = Callback(SubMenuList, page = TOP), title = "Top Casts"))
     oc.add(DirectoryObject(key = Callback(SubMenuList, page = BROWSE), title = "Browse Casts"))
@@ -63,9 +65,21 @@ def MainMenu():
 
 ###################################################################################################
 
+def RecentEventList():
+    cl = sc2casts.SC2CastsClient()
+    oc = ObjectContainer()
+    for i in range(1,6):
+        keyName = ("RecentEvent%d" % (6-i))
+        Log(keyName)
+        if (keyName in Dict):
+            oc.add(DirectoryObject(key = Callback(SubBrowseList, id=Dict[("RecentEventID%d" % (6-i))], title=Dict[keyName], section=sc2casts.SECTION_EVENT), title = Dict[keyName]))
+    return oc
+
+###################################################################################################
+
 def RecentList():
     cl = sc2casts.SC2CastsClient()
-    return SeriesList('Recent casts', cl.getRecentCasts())
+    return SeriesList('Recent casts', cl.getRecentCasts(), False)
 
 ###################################################################################################
 
@@ -80,10 +94,13 @@ def SubMenuList(page):
         oc.add(DirectoryObject(key = Callback(TopList, page = sc2casts.TIMEFRAME_ALL), title = "All Time"))
     if page == BROWSE:
         oc.title2='Browse'
-        oc.add(DirectoryObject(key = Callback(BrowseList, page = sc2casts.SECTION_EVENT), title = "Browse Events"))
-        oc.add(DirectoryObject(key = Callback(BrowseList, page = sc2casts.SECTION_PLAYER), title = "Browse Players"))
-        oc.add(DirectoryObject(key = Callback(BrowseList, page = sc2casts.SECTION_CASTER), title = "Browse Casters"))
-        oc.add(DirectoryObject(key = Callback(BrowseList, page = sc2casts.SECTION_MATCHUP), title = "Browse Matchups"))
+        oc.add(DirectoryObject(key = Callback(BrowseList, page = sc2casts.SECTION_TOP_EVENT, letter=None), title = "Prominent Events"))
+        oc.add(DirectoryObject(key = Callback(BrowseList, page = sc2casts.SECTION_TOP_PLAYER, letter=None), title = "Notable Players"))
+        oc.add(DirectoryObject(key = Callback(BrowseList, page = sc2casts.SECTION_TOP_CASTER, letter=None), title = "Prominent Casters"))
+        oc.add(DirectoryObject(key = Callback(BrowseAlphabet, page = sc2casts.SECTION_EVENT), title = "Browse Events"))
+        oc.add(DirectoryObject(key = Callback(BrowseAlphabet, page = sc2casts.SECTION_PLAYER), title = "Browse Players"))
+        oc.add(DirectoryObject(key = Callback(BrowseAlphabet, page = sc2casts.SECTION_CASTER), title = "Browse Casters"))
+        oc.add(DirectoryObject(key = Callback(BrowseList, page = sc2casts.SECTION_MATCHUP, letter=""), title = "Browse Matchups"))
     
     return oc
 
@@ -91,40 +108,108 @@ def SubMenuList(page):
                                                
 def SearchList(query):
     cl = sc2casts.SC2CastsClient()
-    return SeriesList('Search results', cl.search(query))
+    return SeriesList('Search results', cl.search(query), True)
                                                
 ###################################################################################################
 
 def TopList(page):
     cl = sc2casts.SC2CastsClient()
-    return SeriesList('Top casts', cl.getTopCasts(page))
+    return SeriesList('Top casts', cl.getTopCasts(page), False)
 
 ###################################################################################################
 
-def BrowseList(page):
+def BrowseAlphabet(page):
+    oc = ObjectContainer(title2 = 'Browse: ' + page)
+    alphabet = "0abcdefghijklmnopqrstuvwxyz"
+    for i in range(0, len(alphabet)):
+        c = alphabet[i].upper()
+        cd = c
+        if cd=="0":
+            cd = "0-9"
+        oc.add(DirectoryObject(key = Callback(BrowseList, page = page, letter=c), title = cd))
+    return oc
+
+###################################################################################################
+
+def BrowseList(page, letter):
     cl = sc2casts.SC2CastsClient()
     blist = cl.browse(page)
-    
     oc = ObjectContainer(title2 = 'Browse: ' + page)
     for entry in blist:
         if page == sc2casts.SECTION_MATCHUP:
-            oc.add(DirectoryObject(key = Callback(SubBrowseList, id = entry[0], section = page), title = entry[1], thumb = R("%s.png" % entry[1])))
+            oc.add(DirectoryObject(key = Callback(SubBrowseList, id = entry[0], section = page, title = entry[1]), title = entry[1], thumb = R("%s.png" % entry[1])))
         else:
-            oc.add(DirectoryObject(key = Callback(SubBrowseList, id = entry[0], section = page), title = entry[1]))
+            if letter==None or entry[1][0].upper()==letter:
+                oc.add(DirectoryObject(key = Callback(SubBrowseList, id = entry[0], section = page, title = entry[1]), title = entry[1]))
     
     return oc
 
 ###################################################################################################
 
-def SubBrowseList(id, section):
+def SubBrowseList(id, section, title):
     cl = sc2casts.SC2CastsClient()
-    return SeriesList('Browse : ' + section, cl.subBrowse(section,id))
+    if ((section==sc2casts.SECTION_EVENT) or (section==sc2casts.SECTION_TOP_EVENT)):
+        insertIndex = 1
+        found = -1
+        if ("RecentEvent1" in Dict):
+            for i in range(1, 6):
+                keyName = "RecentEvent%d" % i
+                keyNameID = "RecentEventID%d" % i
+                if (keyName in Dict):
+                    insertIndex = i+1
+                    if (Dict[keyName]==title):
+                        found = i
+        if (found==-1):
+            if (insertIndex==6):
+                for i in range(1, 6):
+                    keyName = "RecentEvent%d" % i
+                    keyNameID = "RecentEventID%d" % i
+                    keyNameNext = "RecentEvent%d" % (i+1)
+                    keyNameNextID = "RecentEventID%d" % (i+1)
+                    Dict[keyName] = Dict[keyNameNext]
+                    Dict[keyNameID] = Dict[keyNameNextID]
+                insertIndex = 5
+        else:
+            for i in range(found, 5):
+                keyName = "RecentEvent%d" % (i)
+                keyNameID = "RecentEventID%d" % (i)
+                keyNameNext = "RecentEvent%d" % (i+1)
+                keyNameNextID = "RecentEventID%d" % (i+1)
+                Log("Moving - "+keyName)
+                if (keyNameNext in Dict):
+                    insertIndex = i+1
+                    Dict[keyName] = Dict[keyNameNext]
+                    Dict[keyNameID] = Dict[keyNameNextID]
+        Log("Insert Index %d" % insertIndex)
+        Dict["RecentEvent%d"%insertIndex] = title
+        Dict["RecentEventID%d"%insertIndex] = id
+        Dict.Save()
+        gameList = cl.subBrowseGroups(id)
+        return GroupList('Browse : '+title, gameList)
+    else:
+        gameList = cl.subBrowse(section,id)
+        return SeriesList('Browse : ' + title, gameList, False)
 
 ###################################################################################################
 
-def SeriesList(title, listOfGames):
-    oc = ObjectContainer(view_group = 'InfoList', title2 = title)
+def GroupList(title, listOfGroups):
+    oc = ObjectContainer(view_group = 'InfoList', title2 = title, no_cache=True)
+    for group in listOfGroups:
+        oc.add(DirectoryObject(key = Callback(GroupListBrowse, group=group, title=title), title=group.name))
+    return oc
+
+###################################################################################################
+
+def GroupListBrowse(group, title):
+    cl = sc2casts.SC2CastsClient()
+    return SeriesList(title+" : "+group.name, cl.subBrowseGroupList(group.eid, group.rid), True)
     
+###################################################################################################
+
+def SeriesList(title, listOfGames, reverse):
+    oc = ObjectContainer(view_group = 'InfoList', title2 = title)
+    if reverse:
+        listOfGames.reverse()
     for game in listOfGames:
         title = "%s vs %s (%s)" % (game.players[0], game.players[1], game.bestof)
         summary = "%s - %s, casted by: %s" % (game.event, game.round, game.caster)
@@ -140,7 +225,8 @@ def SeriesList(title, listOfGames):
 
 def GameInfo(game):
     sc2casts.getCastDetails(game)
-    oc = ObjectContainer(view_group = 'InfoList', title2 = '%s vs %s (%s)' % (game.players[0], game.players[1], game.bestof))
+    datestr = game.date_added.strftime("%d-%m-%Y")
+    oc = ObjectContainer(view_group = 'InfoList', title2 = '%s vs %s (%s) Added: %s' % (game.players[0], game.players[1], game.bestof, datestr))
 
     gamenr = 1
     rating = 0.0
@@ -155,23 +241,40 @@ def GameInfo(game):
             partnr = 1
             for part in p:
                 title = "Game %d, part %d" % (gamenr, partnr)
+                if Prefs["spoiler_thumbs"]:
+                    oc.add(VideoClipObject(
+                        url = YOUTUBE_VIDEO_PAGE % part,
+                        title = title,
+                        summary = summary,
+                        rating = rating,
+                        originally_available_at = game.date_added,
+                        thumb = Callback(GetThumb, id = game.games[0][0])))
+                else:
+                    oc.add(VideoClipObject(
+                        url = YOUTUBE_VIDEO_PAGE % part,
+                        title = title,
+                        summary = summary,
+                        rating = rating,
+                        originally_available_at = game.date_added,
+                        thumb = Callback(GetThumb, id = part)))
+                partnr+=1
+        else:
+            if Prefs["spoiler_thumbs"]:
                 oc.add(VideoClipObject(
-                    url = YOUTUBE_VIDEO_PAGE % part,
-                    title = title,
+                    url = YOUTUBE_VIDEO_PAGE % p[0],
+                    title = "Game %d" % gamenr,
                     summary = summary,
                     rating = rating,
                     originally_available_at = game.date_added,
-                    thumb = Callback(GetThumb, id = part)))
-
-                partnr+=1
-        else:
-            oc.add(VideoClipObject(
-                url = YOUTUBE_VIDEO_PAGE % p[0],
-                title = "Game %d" % gamenr,
-                summary = summary,
-                rating = rating,
-                originally_available_at = game.date_added,
-                thumb = Callback(GetThumb, id = p[0])))
+                    thumb = Callback(GetThumb, id = game.games[0][0])))
+            else:
+                oc.add(VideoClipObject(
+                    url = YOUTUBE_VIDEO_PAGE % p[0],
+                    title = "Game %d" % gamenr,
+                    summary = summary,
+                    rating = rating,
+                    originally_available_at = game.date_added,
+                    thumb = Callback(GetThumb, id = p[0])))
 
         gamenr+=1
     

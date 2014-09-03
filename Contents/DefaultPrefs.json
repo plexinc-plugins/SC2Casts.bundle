@@ -1,0 +1,8 @@
+[
+    {
+        "id":"spoiler_thumbs",
+        "label":"Hide Spoiler Thumbnails",
+        "type":"bool",
+        "default":"true",
+    }
+]
