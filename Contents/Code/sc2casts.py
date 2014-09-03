@@ -15,6 +15,9 @@ TIMEFRAME_WEEK='week'
 TIMEFRAME_MONTH='month'
 TIMEFRAME_ALL='all'
 
+SECTION_TOP_PLAYER='topplayers'
+SECTION_TOP_CASTER='topcasters'
+SECTION_TOP_EVENT='topevents'
 SECTION_PLAYER='players'
 SECTION_CASTER='casters'
 SECTION_EVENT='events'
@@ -31,7 +34,7 @@ RACES = {
     3:'Z'
 }
 
-BASE_URL = 'http://sc2casts.com/services/plex/'
+BASE_URL = 'http://sc2casts.com/services/plex/v2/'
 
 CACHE_TIME_LONG    = 60*60*24*30 # Thirty days
 CACHE_TIME_SHORT   = 60*10    # 10  minutes
@@ -172,6 +175,30 @@ class SC2CastsClient:
         if root is None:
             return []
 
+        ret = []
+        for serie in root.xpath('//series'):
+            cast = SC2Cast()
+            fillFromNode(cast,serie)
+            ret.append(cast)
+        return ret
+        
+    def subBrowseGroups(self, id):
+        root = sc2request('browse', {'q':"getrounds_%d" %  (int(id))})
+        if root is None:
+            return []
+        ret = []
+        for serie in root.xpath('//series'):
+            cast = SC2Cast()
+            cast.eid = subnodeInt(serie, "eid")
+            cast.rid = subnodeInt(serie, "rid")
+            cast.name = subnodeText(serie, 'name')
+            ret.append(cast)
+        return ret
+        
+    def subBrowseGroupList(self, eid, rid):
+        root = sc2request('browse', {'q':"getseriesbyround_%d_%d" %  (int(eid), int(rid))})
+        if root is None:
+            return []
         ret = []
         for serie in root.xpath('//series'):
             cast = SC2Cast()
